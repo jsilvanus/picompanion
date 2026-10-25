@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-companion:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish single-file Windows x64 executable
+        shell: pwsh
+        run: |
+          dotnet publish PiMatrixCompanion.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o release/companion-win-x64
+          Compress-Archive -Path release/companion-win-x64/* -DestinationPath release/PiMatrixCompanion-windows-x64.zip
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PiMatrixCompanion-windows-x64
+          path: release/PiMatrixCompanion-windows-x64.zip
+
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" release/PiMatrixCompanion-windows-x64.zip --clobber
